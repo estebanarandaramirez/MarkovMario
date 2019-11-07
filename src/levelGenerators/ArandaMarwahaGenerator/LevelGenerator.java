@@ -1,60 +1,101 @@
 package levelGenerators.ArandaMarwahaGenerator;
 
-import java.util.Random;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
+import java.lang.reflect.Array;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.*;
+import java.lang.String;
 
 import engine.core.MarioLevelGenerator;
 import engine.core.MarioLevelModel;
 import engine.core.MarioTimer;
+import org.omg.Messaging.SYNC_WITH_TRANSPORT;
 
 public class LevelGenerator implements MarioLevelGenerator {
     // class attributes
-    public int maxGaps;
-
-    // constants
-    private double CHANCE_BLOCK_POWER_UP = 0.1;
-    private double CHANCE_BLOCK_COIN = 0.3;
-    private double CHANCE_BLOCK_ENEMY = 0.2;
-    private double CHANCE_WINGED = 0.5;
-    private double CHANCE_COIN = 0.2;
-    private double COIN_HEIGHT = 5;
-    private double CHANCE_PLATFORM = 0.1;
-    private double CHANCE_END_PLATFORM = 0.1;
-    private int PLATFORM_HEIGHT = 4;
-    private double CHANCE_ENEMY = 0.1;
-    private double CHANCE_PIPE = 0.1;
-    private int PIPE_MIN_HEIGHT = 2;
-    private double PIPE_HEIGHT = 3.0;
-    private int minX = 5;
-    private double CHANCE_HILL = 0.1;
-    private double CHANCE_END_HILL = 0.3;
-    private double CHANCE_HILL_ENEMY = 0.3;
-    private double HILL_HEIGHT = 4;
-    private int GAP_LENGTH = 5;
-    private double CHANGE_GAP = 0.1;
-    private double CHANGE_HILL_CHANGE = 0.1;
-    private double GAP_OFFSET = -5;
-    private double GAP_RANGE = 10;
-    private int GROUND_MAX_HEIGHT = 5;
+    public String map;
 
     // random seed
     Random seed;
 
+    // constructors
+    public LevelGenerator(String filePath) {
+        this.map = getLevel(filePath);
+    }
+
     public LevelGenerator() {
-        this.maxGaps = 10;
+        this.map = getLevel("levels/original/lvl-1.txt");
     }
 
-    public LevelGenerator(int maxGaps) {
-        this.maxGaps = maxGaps;
+    // getLevel specified by input
+    // TAKEN FROM PlayerLevel.java
+    public static String getLevel(String filepath) {
+        String content = "";
+        try {
+            content = new String(Files.readAllBytes(Paths.get(filepath)));
+        } catch (IOException e) {
+        }
+        return content;
     }
 
-    public int generateTransitionModel() {
-        return 1;
+    public char[][] extractColumns() {
+        int width = this.map.indexOf("\n")+1;
+        int height = this.map.split("\n").length;
+        char[] arrayChar = this.map.toCharArray();
+        char[][] columns = new char[width][height];
+        for(int i = 0; i < width; i++) {
+            for(int j = 0; j < height; j++) {
+                if(i != (width-1)) {
+                    columns[i][j] = arrayChar[i+(width*j)];
+                } else {
+                    columns[i][j] = '\n';
+                }
+            }
+        }
+        return columns;
     }
 
     @Override
     public String getGeneratedLevel(MarioLevelModel model, MarioTimer timer) {
+        this.seed = new Random();
         model.clearMap();
-        return model.getMap();
+
+        char[][] columns = extractColumns();
+
+        int finalColumn = 0;
+        for(int i = 0; i < columns.length; i++) {
+            if(Arrays.toString(columns[i]).contains("F")) {
+                finalColumn = i;
+                break;
+            }
+        }
+
+        char[] charMap = new char[model.getWidth()*model.getHeight()];
+
+        for(int i = 0; i < model.getWidth(); i++) {
+            char[] chosenColumn;
+            if(i == 0) {
+                chosenColumn = columns[0];
+            } else if(i == (model.getWidth()-2)) {
+                chosenColumn = columns[finalColumn];
+            } else if(i == (model.getWidth()-1)) {
+                chosenColumn = columns[this.map.indexOf("\n")];
+            } else {
+                int rand = this.seed.nextInt(columns.length-2)+1;
+                chosenColumn = columns[rand];
+            }
+
+            for(int j = 0; j < model.getHeight(); j++) {
+                charMap[i + (model.getWidth() * j)] = chosenColumn[j];
+            }
+        }
+
+        String result = new String(charMap);
+        return result;
     }
 
     @Override
