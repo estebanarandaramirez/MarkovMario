@@ -1,10 +1,6 @@
 package levelGenerators.ArandaMarwahaGenerator;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.UnsupportedEncodingException;
-import java.lang.reflect.Array;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
@@ -13,7 +9,6 @@ import java.lang.String;
 import engine.core.MarioLevelGenerator;
 import engine.core.MarioLevelModel;
 import engine.core.MarioTimer;
-import org.omg.Messaging.SYNC_WITH_TRANSPORT;
 
 public class LevelGenerator implements MarioLevelGenerator {
     // class attributes
@@ -59,6 +54,34 @@ public class LevelGenerator implements MarioLevelGenerator {
         return columns;
     }
 
+    public List<List<Integer>> heuristicClassifier(char[][] columns, int finalColumn, int marioColumn) {
+        List<List<Integer>> classifications = new ArrayList<>();
+        List<Integer> bad = new ArrayList<>();
+        List<Integer> lessBad = new ArrayList<>();
+        List<Integer> normal = new ArrayList<>();
+        List<Integer> good = new ArrayList<>();
+        String tempArray;
+        for(int i = 0; i < columns.length; i++) {
+            if(i != 0 && i != marioColumn && i != finalColumn && i != (columns.length-1)) {
+                tempArray = Arrays.toString(columns[i]);
+                if(tempArray.contains("@") || tempArray.contains("Q") || tempArray.contains("o") || tempArray.contains("!")) {
+                    good.add(i);
+                } else if (tempArray.contains("g") || tempArray.contains("k") || tempArray.contains("r") || !(tempArray.contains("X"))) {
+                    bad.add(i);
+                } else if(tempArray.contains("T") || tempArray.contains("S") || tempArray.contains("#")) {
+                    lessBad.add(i);
+                } else {
+                    normal.add(i);
+                }
+            }
+        }
+        classifications.add(bad);
+        classifications.add(lessBad);
+        classifications.add(normal);
+        classifications.add(good);
+        return classifications;
+    }
+
     @Override
     public String getGeneratedLevel(MarioLevelModel model, MarioTimer timer) {
         this.seed = new Random();
@@ -67,29 +90,50 @@ public class LevelGenerator implements MarioLevelGenerator {
         char[][] columns = extractColumns();
 
         int finalColumn = 0;
+        int marioColumn = 0;
         for(int i = 0; i < columns.length; i++) {
             if(Arrays.toString(columns[i]).contains("F")) {
                 finalColumn = i;
-                break;
+            } else if(Arrays.toString(columns[i]).contains("M")) {
+                marioColumn = i;
             }
         }
+
+        List<List<Integer>> classifications = heuristicClassifier(columns, finalColumn, marioColumn);
 
         char[] charMap = new char[model.getWidth()*model.getHeight()];
 
         for(int i = 0; i < model.getWidth(); i++) {
             char[] chosenColumn;
-            if(i == 0) {
+            if (i == 0) {
                 chosenColumn = columns[0];
-            } else if(i == (model.getWidth()-2)) {
+            } else if (i == 1) {
+                chosenColumn = columns[marioColumn];
+            }else if (i == (model.getWidth() - 2)) {
                 chosenColumn = columns[finalColumn];
-            } else if(i == (model.getWidth()-1)) {
+            } else if (i == (model.getWidth() - 1)) {
                 chosenColumn = columns[this.map.indexOf("\n")];
             } else {
-                int rand = this.seed.nextInt(columns.length-2)+1;
-                chosenColumn = columns[rand];
+                int rand = this.seed.nextInt(100) + 1;
+                if (rand <= 20) {
+                    // choose random column from good group
+                    List<Integer> good = classifications.get(3);
+                    chosenColumn = columns[good.get(this.seed.nextInt(good.size()))];
+                } else if (rand > 20 && rand <= 60) {
+                    // choose random column from bad group
+                    List<Integer> bad = classifications.get(0);
+                    chosenColumn = columns[bad.get(this.seed.nextInt(bad.size()))];
+                } else if (rand > 60 && rand <= 70) {
+                    // choose random column from lessBad group
+                    List<Integer> lessBad = classifications.get(1);
+                    chosenColumn = columns[lessBad.get(this.seed.nextInt(lessBad.size()))];
+                } else {
+                    // choose random column from normal group
+                    List<Integer> normal = classifications.get(2);
+                    chosenColumn = columns[normal.get(this.seed.nextInt(normal.size()))];
+                }
             }
-
-            for(int j = 0; j < model.getHeight(); j++) {
+            for (int j = 0; j < model.getHeight(); j++) {
                 charMap[i + (model.getWidth() * j)] = chosenColumn[j];
             }
         }
